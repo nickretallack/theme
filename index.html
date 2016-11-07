@@ -25,6 +25,10 @@ function make_modifiers(keys) {
 	});	
 }
 
+function index_to_frequency(index, modifiers) {
+	return tonic * modifiers[index % modifiers.length]
+}
+
 MAJOR_MODIFIERS = make_modifiers(MAJOR);
 MINOR_MODIFIERS = make_modifiers(MINOR);
 
@@ -36,21 +40,26 @@ oscillators.length = TONE_KEYS.length;
 
 addEventListener('keydown', function(event) {
 	var index = TONE_KEYS.indexOf(event.code);
+	var modifiers = event.getModifierState('CapsLock') ? MINOR_MODIFIERS : MAJOR_MODIFIERS;
 	if (index != -1) {
 		if (oscillators[index]) {
 			return;
 		}
 		// start an oscillator
-		var modifiers = event.getModifierState('CapsLock') ? MINOR_MODIFIERS : MAJOR_MODIFIERS;
 		var oscillator = context.createOscillator();
 		oscillators[index] = oscillator;
-		oscillator.frequency.value = tonic * modifiers[index % modifiers.length];
+		oscillator.frequency.value = index_to_frequency(index, modifiers);
 		oscillator.connect(context.destination);
 		oscillator.start();
 	} else {
 		var index = KEY_CHANGE_KEYS.indexOf(event.code);
 		if (index != -1) {
 			tonic = BASE_TONIC * EQUAL_TEMPERAMENT[index];
+			oscillators.map(function(oscillator, index) {
+				if (oscillator) {
+					oscillator.frequency.value = index_to_frequency(index, modifiers);
+				}
+			})
 		}
 	}
 })
@@ -58,14 +67,18 @@ addEventListener('keydown', function(event) {
 addEventListener('keyup', function(event) {
 	var index = TONE_KEYS.indexOf(event.code);
 	if (index != -1) {
-		oscillators[index].stop();
-		oscillators[index] = undefined;
+		if (oscillators[index]) {
+			oscillators[index].stop();
+			oscillators[index] = undefined;
+		}
 	}
 })
 
 addEventListener('blur', function(event) {
 	oscillators.map(function(oscillator, index) {
-		oscillator.stop();
+		if (oscillator) {
+			oscillator.stop();	
+		}
 		return undefined;
 	})
 })
