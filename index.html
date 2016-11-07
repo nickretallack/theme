@@ -9,6 +9,7 @@ MODIFIER_KEYS = ['CapsLock']
 TONE_KEYS = LOW_ROW.concat(HOME_ROW).concat(HIGH_ROW);
 TONE_KEY_OFFSET = 4;
 KEY_CHANGE_KEYS = NUMBER_ROW
+MAX_GAIN = 0.75;
 
 BASE_TONIC = 110;
 MAJOR = [1, 3, 5, 6, 8, 10, 12]
@@ -37,11 +38,37 @@ var context = new AudioContext();
 var tonic = BASE_TONIC;
 var oscillators = [];
 oscillators.length = TONE_KEYS.length;
+var master_gain = context.createGain();
+master_gain.connect(context.destination);
+
+function update_gain() {
+	var active = get_num_active_oscillators();
+	var new_gain = undefined;
+	// Must be at least one, otherwise our gain will be nuts
+	active = Math.max(active, 1);
+	new_gain = (1 / active) * MAX_GAIN;
+	console.log(new_gain);
+
+	master_gain.gain.value = new_gain;
+}
+
+function get_num_active_oscillators() {
+	var oscillator_count = oscillators.reduce(function(previous, current) {
+		if(typeof(current) === 'undefined') {
+			return previous;
+		} else {
+			return previous + 1;
+		}
+	}, 0);
+
+	return oscillator_count;
+}
 
 addEventListener('keydown', function(event) {
 	var index = TONE_KEYS.indexOf(event.code);
 	var major = !event.getModifierState('CapsLock');
 	var sharp = event.getModifierState('Shift');
+
 	if (index != -1) {
 		if (oscillators[index]) {
 			return;
@@ -50,7 +77,7 @@ addEventListener('keydown', function(event) {
 		var oscillator = context.createOscillator();
 		oscillators[index] = oscillator;
 		oscillator.frequency.value = index_to_frequency(index, tonic, major, sharp);
-		oscillator.connect(context.destination);
+		oscillator.connect(master_gain);
 		oscillator.start();
 	} else {
 		var index = KEY_CHANGE_KEYS.indexOf(event.code);
@@ -61,6 +88,8 @@ addEventListener('keydown', function(event) {
 			update_all(tonic, major, sharp);
 		}
 	}
+
+	update_gain();
 })
 
 addEventListener('keyup', function(event) {
@@ -75,6 +104,8 @@ addEventListener('keyup', function(event) {
 		var sharp = event.getModifierState('Shift');
 		update_all(tonic, major, sharp);
 	}
+
+	update_gain();
 })
 
 addEventListener('blur', function(event) {
@@ -84,6 +115,8 @@ addEventListener('blur', function(event) {
 		}
 		return undefined;
 	})
+
+	update_gain();
 })
 
 </script>
