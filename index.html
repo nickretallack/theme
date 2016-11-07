@@ -5,32 +5,32 @@ NUMBER_ROW = ['Backquote', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Di
 HIGH_ROW = ['KeyQ', 'KeyW', 'KeyE', 'KeyR', 'KeyT', 'KeyY', 'KeyU', 'KeyI', 'KeyO', 'KeyP', 'BracketLeft', 'BracketRight', 'Backslash']
 HOME_ROW = ['KeyA', 'KeyS', 'KeyD', 'KeyF', 'KeyG', 'KeyH', 'KeyJ', 'KeyK', 'KeyL', 'Semicolon', 'Quote']
 LOW_ROW = ['KeyZ', 'KeyX', 'KeyC', 'KeyV', 'KeyB', 'KeyN', 'KeyM', 'Comma', 'Period', 'Slash']
+MODIFIER_KEYS = ['CapsLock']
 TONE_KEYS = LOW_ROW.concat(HOME_ROW).concat(HIGH_ROW);
 TONE_KEY_OFFSET = 4;
 KEY_CHANGE_KEYS = NUMBER_ROW
 
-// LOW_ROW = 
 BASE_TONIC = 110;
 MAJOR = [1, 3, 5, 6, 8, 10, 12]
 MINOR = [1, 3, 4, 6, 8, 9, 11]
-EQUAL_TEMPERAMENT = KEY_CHANGE_KEYS.map(function(_, index) {
-	return Math.pow(2, index/12.0);
-})
-function make_modifiers(keys) {
-	return TONE_KEYS.map(function(_, index) {
-		index += TONE_KEY_OFFSET;
-		var rem = Math.floor(index / MAJOR.length);
-		var rat = keys[index % MAJOR.length] - 1;
-		return Math.pow(2, rem + (rat/12.0));
-	});	
+
+function index_to_frequency(index, tonic, major, sharp) {
+	index += TONE_KEY_OFFSET;
+	var scale = major ? MAJOR : MINOR;
+	var rem = Math.floor(index / scale.length);
+	var sharp_factor = sharp ? 0 : -1;
+	var chromatic_index = scale[index % scale.length] + sharp_factor;
+	var ratio = Math.pow(2, rem + chromatic_index/12.0)
+	return tonic * ratio;
 }
 
-function index_to_frequency(index, modifiers) {
-	return tonic * modifiers[index % modifiers.length]
+function update_all(tonic, major, sharp) {
+	oscillators.map(function(oscillator, index) {
+		if (oscillator) {
+			oscillator.frequency.value = index_to_frequency(index, tonic, major, sharp);
+		}
+	})
 }
-
-MAJOR_MODIFIERS = make_modifiers(MAJOR);
-MINOR_MODIFIERS = make_modifiers(MINOR);
 
 // stateful
 var context = new AudioContext();
@@ -40,7 +40,8 @@ oscillators.length = TONE_KEYS.length;
 
 addEventListener('keydown', function(event) {
 	var index = TONE_KEYS.indexOf(event.code);
-	var modifiers = event.getModifierState('CapsLock') ? MINOR_MODIFIERS : MAJOR_MODIFIERS;
+	var major = !event.getModifierState('CapsLock');
+	var sharp = event.getModifierState('Shift');
 	if (index != -1) {
 		if (oscillators[index]) {
 			return;
@@ -48,18 +49,16 @@ addEventListener('keydown', function(event) {
 		// start an oscillator
 		var oscillator = context.createOscillator();
 		oscillators[index] = oscillator;
-		oscillator.frequency.value = index_to_frequency(index, modifiers);
+		oscillator.frequency.value = index_to_frequency(index, tonic, major, sharp);
 		oscillator.connect(context.destination);
 		oscillator.start();
 	} else {
 		var index = KEY_CHANGE_KEYS.indexOf(event.code);
 		if (index != -1) {
-			tonic = BASE_TONIC * EQUAL_TEMPERAMENT[index];
-			oscillators.map(function(oscillator, index) {
-				if (oscillator) {
-					oscillator.frequency.value = index_to_frequency(index, modifiers);
-				}
-			})
+			tonic = BASE_TONIC * Math.pow(2, index/12.0);
+			update_all(tonic, major, sharp);
+		} else if (MODIFIER_KEYS.indexOf(event.code) !== -1) {
+			update_all(tonic, major, sharp);
 		}
 	}
 })
@@ -71,6 +70,10 @@ addEventListener('keyup', function(event) {
 			oscillators[index].stop();
 			oscillators[index] = undefined;
 		}
+	} else if (MODIFIER_KEYS.indexOf(event.code) !== -1) {
+		var major = !event.getModifierState('CapsLock');
+		var sharp = event.getModifierState('Shift');
+		update_all(tonic, major, sharp);
 	}
 })
 
@@ -86,7 +89,8 @@ addEventListener('blur', function(event) {
 </script>
 
 <ul>
-<li>Letter and punctuation keys play tones in the major scale.  A in Qwerty is the tonic.</li>
+<li>Letter and punctuation keys play tones in the major scale.  By default, A in Qwerty is A 220.</li>
 <li>Keys in the number row change the key.  Tilde is A 220.</li>
-<li>Switches to minor when caps lock is enabled.</li>
+<li>Switches to minor when Caps Lock is enabled.</li>
+<li>Holding Shift sharps your tone by a half step.  Use this to access notes outside the scale.</li>
 </ul>
