@@ -58,11 +58,18 @@ addEventListener('keydown', function(event) {
 addEventListener('keyup', function(event) {
 	var index = TONE_KEYS.indexOf(event.code);
 	if (index != -1) {
-		// stop an oscillator
 		oscillators[index].stop();
-		delete oscillators[index];
+		oscillators[index] = undefined;
 	}
 })
+
+addEventListener('blur', function(event) {
+	oscillators.map(function(oscillator, index) {
+		oscillator.stop();
+		return undefined;
+	})
+})
+
 </script>
 
 <ul>
