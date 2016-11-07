@@ -1,42 +1,46 @@
 <script>
-var context = new AudioContext();
 
+// constant
 HIGH_ROW = ['KeyQ', 'KeyW', 'KeyE', 'KeyR', 'KeyT', 'KeyY', 'KeyU', 'KeyI', 'KeyO', 'KeyP', 'BracketLeft', 'BracketRight', 'Backslash']
 HOME_ROW = ['KeyA', 'KeyS', 'KeyD', 'KeyF', 'KeyG', 'KeyH', 'KeyJ', 'KeyK', 'KeyL', 'Semicolon', 'Quote']
-OSCILLATORS = [];
-OSCILLATORS.length = HOME_ROW.length;
 BASE_TONIC = 440;
-TONIC = BASE_TONIC;
 MAJOR = [1, 3, 5, 6, 8, 10, 12]
+MINOR = [1, 3, 4, 6, 8, 9, 11]
 EQUAL_TEMPERAMENT = HIGH_ROW.map(function(_, index) {
 	return Math.pow(2, index/12.0);
 })
-MODIFIERS = HOME_ROW.map(function(_, index) {
-	index += 5;
-	var rem = Math.floor(index / MAJOR.length);
-	var rat = MAJOR[index % MAJOR.length] - 1;
-	return Math.pow(2, rem + (rat/12.0));
-})
+function make_modifiers(keys) {
+	return HOME_ROW.map(function(_, index) {
+		index += 5;
+		var rem = Math.floor(index / MAJOR.length);
+		var rat = keys[index % MAJOR.length] - 1;
+		return Math.pow(2, rem + (rat/12.0));
+	});	
+}
 
+MAJOR_MODIFIERS = make_modifiers(MAJOR);
+MINOR_MODIFIERS = make_modifiers(MINOR);
 
-
-// MODIFIERS = [1, 14.0/12, 16.0/12, 17.0/12, 19.0/12, 21.0/12, 23.0/12]
-// MODIFIERS = [1, Math.pow(2, 1/12), 14.0/12, 16.0/12, 17.0/12, 19.0/12, 21.0/12, 23.0/12]
-
+// stateful
+var context = new AudioContext();
+var tonic = BASE_TONIC;
+var oscillators = [];
+oscillators.length = HOME_ROW.length;
 
 addEventListener('keydown', function(event) {
 	var index = HOME_ROW.indexOf(event.code);
-	if (index != -1 && !OSCILLATORS[index]) {
+	if (index != -1 && !oscillators[index]) {
 		// start an oscillator
+		var modifiers = event.getModifierState('CapsLock') ? MINOR_MODIFIERS : MAJOR_MODIFIERS;
 		var oscillator = context.createOscillator();
-		OSCILLATORS[index] = oscillator;
-		oscillator.frequency.value = TONIC * MODIFIERS[index % MODIFIERS.length];
+		oscillators[index] = oscillator;
+		oscillator.frequency.value = tonic * modifiers[index % modifiers.length];
 		oscillator.connect(context.destination);
 		oscillator.start();
 	} else {
 		var index = HIGH_ROW.indexOf(event.code);
 		if (index != -1) {
-			TONIC = BASE_TONIC * EQUAL_TEMPERAMENT[index];
+			tonic = BASE_TONIC * EQUAL_TEMPERAMENT[index];
 		}
 	}
 })
@@ -45,9 +49,14 @@ addEventListener('keyup', function(event) {
 	var index = HOME_ROW.indexOf(event.code);
 	if (index != -1) {
 		// stop an oscillator
-		OSCILLATORS[index].stop();
-		delete OSCILLATORS[index];
+		oscillators[index].stop();
+		delete oscillators[index];
 	}
 })
-
 </script>
+
+<ul>
+<li>Keys on the home row play tones in a major scale.  Tonic is the third from the left (D in Qwerty).</li>
+<li>Keys on the upper row change key, starting with A 440 (Q in Qwerty).</li>
+<li>Switches to minor when caps lock is enabled.</li>
+</ul>
