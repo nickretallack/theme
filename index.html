@@ -70,6 +70,8 @@ addEventListener('keydown', function(event) {
 			sharped: sharp,
 		};
 
+		var gamut = TONE_KEYS.length + 10
+		gain.gain.value = Math.pow((gamut - index) / gamut, 2)
 		oscillator.frequency.value = index_to_frequency(index, tonic, major, sharp);
 		oscillator.connect(gain);
 		gain.connect(context.destination);
