@@ -24,12 +24,17 @@ function index_to_frequency(index, tonic, major, sharp) {
 }
 
 function update_all(tonic, major) {
-	oscillators.map(function(oscillator, index) {
-		if (oscillator) {
-			// console.log(oscillator.sharped)
-			oscillator.frequency.value = index_to_frequency(index, tonic, major, oscillator.sharped);
+	tones.map(function(tone, index) {
+		if (tone) {
+			tone.oscillator.frequency.value = index_to_frequency(index, tonic, major, tone.sharped);
 		}
 	})
+}
+
+function end_tone(tone) {
+	end_time = context.currentTime + 0.1;
+	tone.gain.gain.linearRampToValueAtTime(0, end_time)
+	tone.oscillator.stop(end_time);
 }
 
 // stateful
@@ -41,8 +46,8 @@ if (window.AudioContext) {
 	alert("Your browser does not support the JavaScript Audio API")
 }
 var tonic = BASE_TONIC;
-var oscillators = [];
-oscillators.length = TONE_KEYS.length;
+var tones = [];
+tones.length = TONE_KEYS.length;
 
 addEventListener('keydown', function(event) {
 	if (event.repeat) {
@@ -52,15 +57,22 @@ addEventListener('keydown', function(event) {
 	var major = !event.getModifierState('CapsLock');
 	var sharp = event.getModifierState('Shift');
 	if (index != -1) {
-		if (oscillators[index]) {
+		if (tones[index]) {
 			return;
 		}
-		// start an oscillator
+
+		// start a new tone
 		var oscillator = context.createOscillator();
-		oscillators[index] = oscillator;
+		var gain = context.createGain();
+		tones[index] = {
+			oscillator: oscillator,
+			gain: gain,
+			sharped: sharp,
+		};
+
 		oscillator.frequency.value = index_to_frequency(index, tonic, major, sharp);
-		oscillator.sharped = sharp;
-		oscillator.connect(context.destination);
+		oscillator.connect(gain);
+		gain.connect(context.destination);
 		oscillator.start();
 	} else {
 		var index = KEY_CHANGE_KEYS.indexOf(event.code);
@@ -76,9 +88,9 @@ addEventListener('keydown', function(event) {
 addEventListener('keyup', function(event) {
 	var index = TONE_KEYS.indexOf(event.code);
 	if (index != -1) {
-		if (oscillators[index]) {
-			oscillators[index].stop();
-			oscillators[index] = undefined;
+		if (tones[index]) {
+			end_tone(tones[index]);
+			tones[index] = undefined;
 		}
 	} else if (event.code === 'CapsLock') {
 		// Caps lock is special.  If it's enabled and you press it,
@@ -89,9 +101,9 @@ addEventListener('keyup', function(event) {
 })
 
 addEventListener('blur', function(event) {
-	oscillators.map(function(oscillator, index) {
-		if (oscillator) {
-			oscillator.stop();	
+	tones.map(function(tone, index) {
+		if (tone) {
+			end_tone(tone);
 		}
 		return undefined;
 	})
