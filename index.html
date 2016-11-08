@@ -5,7 +5,6 @@ NUMBER_ROW = ['Backquote', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Di
 HIGH_ROW = ['KeyQ', 'KeyW', 'KeyE', 'KeyR', 'KeyT', 'KeyY', 'KeyU', 'KeyI', 'KeyO', 'KeyP', 'BracketLeft', 'BracketRight', 'Backslash']
 HOME_ROW = ['KeyA', 'KeyS', 'KeyD', 'KeyF', 'KeyG', 'KeyH', 'KeyJ', 'KeyK', 'KeyL', 'Semicolon', 'Quote']
 LOW_ROW = ['KeyZ', 'KeyX', 'KeyC', 'KeyV', 'KeyB', 'KeyN', 'KeyM', 'Comma', 'Period', 'Slash']
-MODIFIER_KEYS = ['CapsLock']
 TONE_KEYS = LOW_ROW.concat(HOME_ROW).concat(HIGH_ROW);
 TONE_KEY_OFFSET = 4;
 KEY_CHANGE_KEYS = NUMBER_ROW
@@ -24,21 +23,31 @@ function index_to_frequency(index, tonic, major, sharp) {
 	return tonic * ratio;
 }
 
-function update_all(tonic, major, sharp) {
+function update_all(tonic, major) {
 	oscillators.map(function(oscillator, index) {
 		if (oscillator) {
-			oscillator.frequency.value = index_to_frequency(index, tonic, major, sharp);
+			// console.log(oscillator.sharped)
+			oscillator.frequency.value = index_to_frequency(index, tonic, major, oscillator.sharped);
 		}
 	})
 }
 
 // stateful
-var context = new AudioContext();
+if (window.AudioContext) {
+	var context = new AudioContext();
+} else if (window.webkitAudioContext) {
+	var context = new webkitAudioContext();
+} else {
+	alert("Your browser does not support the JavaScript Audio API")
+}
 var tonic = BASE_TONIC;
 var oscillators = [];
 oscillators.length = TONE_KEYS.length;
 
 addEventListener('keydown', function(event) {
+	if (event.repeat) {
+		return;
+	}
 	var index = TONE_KEYS.indexOf(event.code);
 	var major = !event.getModifierState('CapsLock');
 	var sharp = event.getModifierState('Shift');
@@ -50,15 +59,16 @@ addEventListener('keydown', function(event) {
 		var oscillator = context.createOscillator();
 		oscillators[index] = oscillator;
 		oscillator.frequency.value = index_to_frequency(index, tonic, major, sharp);
+		oscillator.sharped = sharp;
 		oscillator.connect(context.destination);
 		oscillator.start();
 	} else {
 		var index = KEY_CHANGE_KEYS.indexOf(event.code);
 		if (index != -1) {
 			tonic = BASE_TONIC * Math.pow(2, index/12.0);
-			update_all(tonic, major, sharp);
-		} else if (MODIFIER_KEYS.indexOf(event.code) !== -1) {
-			update_all(tonic, major, sharp);
+			update_all(tonic, major);
+		} else if (event.code === 'CapsLock') {
+			update_all(tonic, major);
 		}
 	}
 })
@@ -70,10 +80,11 @@ addEventListener('keyup', function(event) {
 			oscillators[index].stop();
 			oscillators[index] = undefined;
 		}
-	} else if (MODIFIER_KEYS.indexOf(event.code) !== -1) {
+	} else if (event.code === 'CapsLock') {
+		// Caps lock is special.  If it's enabled and you press it,
+		// it counts as a keyup instead of a keydown in some browser/OS combos.
 		var major = !event.getModifierState('CapsLock');
-		var sharp = event.getModifierState('Shift');
-		update_all(tonic, major, sharp);
+		update_all(tonic, major);
 	}
 })
 
